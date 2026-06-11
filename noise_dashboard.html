@@ -214,7 +214,7 @@
     </div>
   </div>
   <div class="control-group">
-    <label>Table band window</label>
+    <label title="Controls the date window used to compute P5/P95 in the summary table. Shorter windows show recent noise; longer windows give a more stable baseline. Independent from the chart range.">Table band window <span style="color:#aaa;font-size:11px;cursor:default">(?)</span></label>
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
       <div class="btn-group" id="band-btns">
         <button data-days="7">7d</button>
@@ -253,33 +253,14 @@
 <div id="status"></div>
 
 <div id="main">
-  <table id="noise-table">
-    <thead>
-      <tr>
-        <th data-col="name">Test</th>
-        <th data-col="label">Noisiness</th>
-        <th data-col="bandWidth" class="numeric sort-desc">Band (P5–P95) %</th>
-        <th data-col="cv" class="numeric">CV %</th>
-        <th data-col="p05" class="numeric">P05</th>
-        <th data-col="p50" class="numeric">Median</th>
-        <th data-col="p95" class="numeric">P95</th>
-        <th data-col="n" class="numeric">N pts</th>
-        <th>Perfherder</th>
-      </tr>
-    </thead>
-    <tbody id="table-body">
-      <tr><td colspan="9" style="padding:20px; color:#888; text-align:center;">Select a platform to load data</td></tr>
-    </tbody>
-  </table>
-
-  <div id="chart-section" style="display:none">
+  <div id="chart-section" style="display:none; margin-bottom:20px">
     <div id="chart-header">
       <div>
         <div id="chart-title"></div>
         <div id="chart-meta"></div>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <div class="btn-group" id="range-btns">
+        <div class="btn-group" id="range-btns" title="How much history to show in the chart. The noise band is computed from this same window, so a shorter range gives a tighter band based on recent data only.">
           <button data-days="7">1 week</button>
           <button data-days="30">1 month</button>
           <button data-days="90" class="active">3 months</button>
@@ -302,7 +283,27 @@
     </div>
     <div id="band-info"></div>
   </div>
+
+  <table id="noise-table">
+    <thead>
+      <tr>
+        <th data-col="name">Test</th>
+        <th data-col="label">Noisiness</th>
+        <th data-col="bandWidth" class="numeric sort-desc">Band (P5-P95) %</th>
+        <th data-col="cv" class="numeric">CV %</th>
+        <th data-col="p05" class="numeric">P05</th>
+        <th data-col="p50" class="numeric">Median</th>
+        <th data-col="p95" class="numeric">P95</th>
+        <th data-col="n" class="numeric">N pts</th>
+        <th>Perfherder</th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+      <tr><td colspan="9" style="padding:20px; color:#888; text-align:center;">Select a platform to load data</td></tr>
+    </tbody>
+  </table>
 </div>
+
 
 <script>
 const FRAMEWORK = 13;
@@ -594,7 +595,7 @@ function renderTable() {
 function renderChart(test) {
   const section = document.getElementById('chart-section');
   section.style.display = 'block';
-  section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const cfg = PLATFORM_CONFIGS[STATE.platform];
   const displayName = test === 'score' ? 'Overall Score' : test.replace('/total', '');
