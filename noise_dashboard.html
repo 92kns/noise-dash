@@ -252,6 +252,47 @@
 
 <div id="status"></div>
 
+<div id="legend-bar" style="padding:0 24px 0; margin-bottom:4px;">
+  <button id="legend-toggle" onclick="toggleLegend()"
+    style="background:none; border:none; font-size:12px; color:#3366ff; cursor:pointer; padding:6px 0; display:flex; align-items:center; gap:5px;">
+    <span id="legend-arrow">▶</span> How noisiness is determined
+  </button>
+  <div id="legend-body" style="display:none; background:#fff; border:1px solid #ddd; border-radius:6px; padding:16px 20px; margin-top:6px; font-size:13px; line-height:1.6; max-width:800px;">
+    <p style="margin-bottom:10px">
+      For each test and platform, the dashboard pulls <code>performance_datum.value</code> from mozilla-central baseline runs
+      and computes an empirical noise band using the <strong>P5 to P95 range</strong> of daily-averaged values.
+      No normality assumption — it uses the actual distribution of observed data.
+    </p>
+    <p style="margin-bottom:12px">
+      <strong>Band width</strong> = (P95 &minus; P05) / median &times; 100%
+      &nbsp;&nbsp;&nbsp;
+      <strong>CV</strong> = stddev / mean &times; 100%
+    </p>
+    <p style="margin-bottom:8px">Band width thresholds:</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <span style="background:#d4f7e5; color:#1a7a45; padding:3px 10px; border-radius:10px; font-weight:700; font-size:12px;">QUIET</span>
+      <span style="color:#555; font-size:12px; align-self:center">below 4% — well within normal variation, current 2% alert threshold is appropriate</span>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <span style="background:#dce8ff; color:#2255cc; padding:3px 10px; border-radius:10px; font-weight:700; font-size:12px;">MODERATE</span>
+      <span style="color:#555; font-size:12px; align-self:center">4 to 10% — some noise, alert threshold should be raised to roughly 2&times; the band width</span>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+      <span style="background:#fff0d9; color:#b36000; padding:3px 10px; border-radius:10px; font-weight:700; font-size:12px;">NOISY</span>
+      <span style="color:#555; font-size:12px; align-self:center">10 to 20% — high variability, alerts on this test are frequently false positives</span>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+      <span style="background:#ffe0e0; color:#c00; padding:3px 10px; border-radius:10px; font-weight:700; font-size:12px;">VERY NOISY</span>
+      <span style="color:#555; font-size:12px; align-self:center">above 20% — consider disabling alerts or setting a much higher threshold</span>
+    </div>
+    <p style="color:#888; font-size:12px">
+      The band is computed from the visible date window. Changing the chart range or table band window updates the band.
+      Tests with temporal regime shifts (a permanent performance change mid-period) will show a wider band —
+      narrowing the window to a stable period gives a more accurate noise estimate.
+    </p>
+  </div>
+</div>
+
 <div id="main">
   <div id="chart-section" style="display:none; margin-bottom:20px">
     <div id="chart-header">
@@ -891,6 +932,15 @@ function applyCustomRange() {
   STATE.customFrom = new Date(from);
   STATE.customTo = new Date(to + 'T23:59:59');
   if (STATE.selectedTest) renderChart(STATE.selectedTest);
+}
+
+// ── Legend ───────────────────────────────────────────────────────────────────
+function toggleLegend() {
+  const body = document.getElementById('legend-body');
+  const arrow = document.getElementById('legend-arrow');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  arrow.textContent = open ? '▼' : '▶';
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
