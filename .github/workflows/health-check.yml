@@ -1,0 +1,53 @@
+name: Treeherder API Health Check
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # every Monday at 9am UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check SP3 signatures are accessible
+        run: |
+          python3 - <<'EOF'
+          import urllib.request, json, sys
+
+          PLATFORMS = [
+            'windows11-64-24h2-shippable',
+            'macosx1500-aarch64-shippable',
+            'linux2404-64-shippable',
+            'android-hw-a55-14-0-aarch64-shippable',
+          ]
+
+          errors = []
+          for platform in PLATFORMS:
+            url = (
+              f"https://treeherder.mozilla.org/api/project/mozilla-central"
+              f"/performance/signatures/?framework=13&platform={platform}"
+            )
+            try:
+              resp = urllib.request.urlopen(url, timeout=30)
+              data = json.loads(resp.read())
+              sp3 = [
+                s for s in data.values()
+                if s.get('suite') == 'speedometer3'
+                and s.get('application') in ('firefox', 'fenix')
+                and 'gecko-profile' not in (s.get('extra_options') or '')
+              ]
+              if sp3:
+                print(f"OK  {platform}: {len(sp3)} SP3 signatures")
+              else:
+                errors.append(f"MISSING  {platform}: no SP3 Firefox signatures found")
+                print(errors[-1])
+            except Exception as e:
+              errors.append(f"ERROR  {platform}: {e}")
+              print(errors[-1])
+
+          if errors:
+            print(f"\n{len(errors)} platform(s) failed — dashboard may not load correctly")
+            sys.exit(1)
+          else:
+            print("\nAll platforms OK")
+          EOF

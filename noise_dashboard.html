@@ -542,6 +542,9 @@ function renderTable() {
   const tests = Object.keys(STATE.bands).filter(t => STATE.bands[t]);
 
   tests.sort((a, b) => {
+    // Overall score always pinned first
+    if (a === 'score') return -1;
+    if (b === 'score') return 1;
     const va = STATE.bands[a][STATE.sortCol] ?? (typeof STATE.bands[a][STATE.sortCol] === 'string' ? '' : 0);
     const vb = STATE.bands[b][STATE.sortCol] ?? (typeof STATE.bands[b][STATE.sortCol] === 'string' ? '' : 0);
     if (typeof va === 'string') return va.localeCompare(vb) * STATE.sortDir;
