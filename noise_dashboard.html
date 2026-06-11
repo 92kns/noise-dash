@@ -415,12 +415,12 @@ async function fetchSignatures(platformKey) {
 }
 
 function pickBestSig(sigs, testName, app) {
-  // Treeherder API returns test:'score' for overall score (not empty string like STMO)
-  const thTest = testName;
+  // Treeherder may return test:'score' or test:'' for the overall score
+  const thTests = testName === 'score' ? ['score', ''] : [testName];
   const candidates = Object.entries(sigs)
     .filter(([, s]) => {
       if (s.suite !== 'speedometer3') return false;
-      if (s.test !== thTest) return false;
+      if (!thTests.includes(s.test)) return false;
       if (s.application !== app) return false;
       const opts = s.extra_options || '';
       if (opts.includes('gecko-profile')) return false;
@@ -525,6 +525,9 @@ async function loadPlatform() {
     }));
     setStatus(`Loading… ${Math.min(i + BATCH, tests.length)} / ${tests.length}`, true);
   }
+
+  if (!STATE.sigByTest['score']) console.warn('score signature not found for', cfg.platform, cfg.app);
+  else if (!STATE.bands['score']) console.warn('score band is null — not enough data points?', STATE.seriesData['score']?.length, 'pts');
 
   setStatus(`${cfg.label} — ${tests.length} tests loaded, band = last ${STATE.bandDays} days`);
   renderTable();
