@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>SP3 Noise Bands</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #ececec;
+      font-family: Arial, sans-serif;
+      color: #222;
+      min-height: 100vh;
+    }
+
+    #header {
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      padding: 16px 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    #header h1 {
+      font-family: 'Zilla Slab', serif;
+      font-size: 24px;
+    }
+    #header p {
+      font-size: 13px;
+      color: #666;
+    }
+
+    #controls {
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .control-group label {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 4px;
+    }
+    .btn-group button {
+      padding: 5px 12px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-group button:hover { background: #e0e0e0; }
+    .btn-group button.active {
+      background: #3366ff;
+      color: #fff;
+      border-color: #3366ff;
+    }
+
+    #status {
+      padding: 8px 24px;
+      font-size: 13px;
+      color: #555;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #ddd;
+      border-top-color: #3366ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #main { display: flex; gap: 0; padding: 16px 24px; flex-direction: column; }
+
+    /* Summary table */
+    #noise-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    #noise-table thead th {
+      background: #3366ff;
+      color: #fff;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    #noise-table thead th:hover { background: #2255ee; }
+    #noise-table thead th.sort-asc::after { content: ' ▲'; font-size: 10px; }
+    #noise-table thead th.sort-desc::after { content: ' ▼'; font-size: 10px; }
+    #noise-table thead th.numeric { text-align: right; }
+
+    #noise-table tbody tr {
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    #noise-table tbody tr:hover { background: #f0f4ff; }
+    #noise-table tbody tr.selected { background: #e8eeff; }
+    #noise-table tbody td { padding: 9px 14px; }
+    #noise-table tbody td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+    #noise-table tbody td.name { font-weight: 500; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .badge-quiet    { background: #d4f7e5; color: #1a7a45; }
+    .badge-moderate { background: #dce8ff; color: #2255cc; }
+    .badge-noisy    { background: #fff0d9; color: #b36000; }
+    .badge-very-noisy { background: #ffe0e0; color: #c00; }
+
+    .ph-link {
+      font-size: 11px;
+      color: #3366ff;
+      text-decoration: none;
+    }
+    .ph-link:hover { text-decoration: underline; }
+
+    /* Detail chart */
+    #chart-section {
+      margin-top: 20px;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 16px 20px;
+    }
+    #chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    #chart-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    #chart-meta {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+    #chart-canvas-wrap { position: relative; }
+
+    /* Band window selector in chart */
+    #band-info {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #555;
+      padding: 8px 12px;
+      background: #f5f7ff;
+      border-radius: 4px;
+      border-left: 3px solid #3366ff;
+    }
+    .band-info-row { display: flex; gap: 24px; flex-wrap: wrap; }
+    .band-info-item { display: flex; flex-direction: column; }
+    .band-info-item .label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+    .band-info-item .value { font-size: 14px; font-weight: 700; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>SP3 Noise Bands</h1>
+  <p>P5–P95 noise band per subtest, live from Treeherder — mozilla-central baseline</p>
+</div>
+
+<div id="controls">
+  <div class="control-group">
+    <label>Platform</label>
+    <div class="btn-group" id="platform-btns">
+      <button data-platform="windows" class="active">Windows</button>
+      <button data-platform="windows-hwref">Windows (hw-ref)</button>
+      <button data-platform="mac">macOS ARM</button>
+      <button data-platform="linux">Linux</button>
+      <button data-platform="android-a55">Android (A55)</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>Table band window</label>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <div class="btn-group" id="band-btns">
+        <button data-days="7">7d</button>
+        <button data-days="14">14d</button>
+        <button data-days="30">30d</button>
+        <button data-days="90" class="active">90d</button>
+        <button data-days="custom">Custom</button>
+      </div>
+      <div id="custom-band-range" style="display:none; gap:6px; align-items:center; font-size:13px;">
+        <input type="date" id="band-date-from" style="font-size:12px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+        <span style="color:#666">→</span>
+        <input type="date" id="band-date-to" style="font-size:12px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+        <button onclick="applyCustomBandRange()"
+          style="padding:4px 10px; font-size:12px; background:#3366ff; color:#fff; border:none; border-radius:4px; cursor:pointer;">
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>Repository</label>
+    <div class="btn-group" id="repo-btns">
+      <button data-repo="mozilla-central" class="active">mozilla-central</button>
+      <button data-repo="autoland">autoland</button>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>Tests</label>
+    <div class="btn-group" id="test-scope-btns">
+      <button data-scope="totals" class="active">Category totals</button>
+      <button data-scope="all">All subtests</button>
+    </div>
+  </div>
+</div>
+
+<div id="status"></div>
+
+<div id="main">
+  <table id="noise-table">
+    <thead>
+      <tr>
+        <th data-col="name">Test</th>
+        <th data-col="label">Noisiness</th>
+        <th data-col="bandWidth" class="numeric sort-desc">Band (P5–P95) %</th>
+        <th data-col="cv" class="numeric">CV %</th>
+        <th data-col="p05" class="numeric">P05</th>
+        <th data-col="p50" class="numeric">Median</th>
+        <th data-col="p95" class="numeric">P95</th>
+        <th data-col="n" class="numeric">N pts</th>
+        <th>Perfherder</th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+      <tr><td colspan="9" style="padding:20px; color:#888; text-align:center;">Select a platform to load data</td></tr>
+    </tbody>
+  </table>
+
+  <div id="chart-section" style="display:none">
+    <div id="chart-header">
+      <div>
+        <div id="chart-title"></div>
+        <div id="chart-meta"></div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div class="btn-group" id="range-btns">
+          <button data-days="7">1 week</button>
+          <button data-days="30">1 month</button>
+          <button data-days="90" class="active">3 months</button>
+          <button data-days="365">1 year</button>
+          <button data-days="custom">Custom</button>
+        </div>
+        <div id="custom-range" style="display:none; gap:6px; align-items:center; font-size:13px;">
+          <input type="date" id="date-from" style="font-size:12px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+          <span style="color:#666">→</span>
+          <input type="date" id="date-to" style="font-size:12px; padding:4px 6px; border:1px solid #ccc; border-radius:4px;">
+          <button onclick="applyCustomRange()"
+            style="padding:4px 10px; font-size:12px; background:#3366ff; color:#fff; border:none; border-radius:4px; cursor:pointer;">
+            Apply
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="chart-canvas-wrap">
+      <canvas id="chart" height="320"></canvas>
+    </div>
+    <div id="band-info"></div>
+  </div>
+</div>
+
+<script>
+const FRAMEWORK = 13;
+
+const PLATFORM_CONFIGS = {
+  'windows':      { label: 'Windows 11',        platform: 'windows11-64-24h2-shippable',          app: 'firefox' },
+  'windows-hwref':{ label: 'Windows 11 hw-ref', platform: 'windows11-64-24h2-hw-ref-shippable',    app: 'firefox' },
+  'mac':          { label: 'macOS ARM',          platform: 'macosx1500-aarch64-shippable',          app: 'firefox' },
+  'linux':        { label: 'Linux',              platform: 'linux2404-64-shippable',                app: 'firefox' },
+  'android-a55':  { label: 'Android A55',        platform: 'android-hw-a55-14-0-aarch64-shippable', app: 'fenix'   },
+};
+
+const SUBTEST_TOTALS = [
+  'score',
+  'Charts-chartjs/total',
+  'Charts-observable-plot/total',
+  'Editor-CodeMirror/total',
+  'Editor-TipTap/total',
+  'NewsSite-Next/total',
+  'NewsSite-Nuxt/total',
+  'Perf-Dashboard/total',
+  'React-Stockcharts-SVG/total',
+  'TodoMVC-Angular-Complex-DOM/total',
+  'TodoMVC-Backbone/total',
+  'TodoMVC-JavaScript-ES5/total',
+  'TodoMVC-JavaScript-ES6-Webpack-Complex-DOM/total',
+  'TodoMVC-jQuery/total',
+  'TodoMVC-Lit-Complex-DOM/total',
+  'TodoMVC-Preact-Complex-DOM/total',
+  'TodoMVC-React-Complex-DOM/total',
+  'TodoMVC-React-Redux/total',
+  'TodoMVC-Svelte-Complex-DOM/total',
+  'TodoMVC-Vue/total',
+  'TodoMVC-WebComponents/total',
+];
+
+const STATE = {
+  repo: 'mozilla-central',
+  platform: 'windows',
+  bandDays: 90,
+  scope: 'totals',
+  signatures: {},      // sigId -> sig object
+  sigByTest: {},       // testName -> sigId
+  seriesData: {},      // testName -> [{date, value, revision, sigId}]
+  bands: {},           // testName -> {p05, p50, p95, cv, bandWidth, label, n}
+  selectedTest: null,
+  chart: null,
+  chartDays: 90,
+  sortCol: 'bandWidth',
+  sortDir: -1,         // -1 = desc, 1 = asc
+  customFrom: null,
+  customTo: null,
+  customBandFrom: null,
+  customBandTo: null,
+};
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function round(v, d) { return Math.round(v * 10 ** d) / 10 ** d; }
+
+function pct(vals, p) {
+  const sv = [...vals].sort((a, b) => a - b);
+  const idx = (sv.length - 1) * p / 100;
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  return sv[lo] + (sv[hi] - sv[lo]) * (idx - lo);
+}
+
+function computeBandFromVals(vals) {
+  const v = vals.filter(x => x > 0);
+  if (v.length < 5) return null;
+  const p05 = pct(v, 5), p50 = pct(v, 50), p95 = pct(v, 95);
+  const mean = v.reduce((s, x) => s + x, 0) / v.length;
+  const variance = v.reduce((s, x) => s + (x - mean) ** 2, 0) / Math.max(v.length - 1, 1);
+  const cv = Math.sqrt(variance) / mean * 100;
+  const bandWidth = p50 > 0 ? (p95 - p05) / p50 * 100 : 0;
+  const label = bandWidth < 4 ? 'quiet' : bandWidth < 10 ? 'moderate' : bandWidth < 20 ? 'noisy' : 'very noisy';
+  return { p05, p50, p95, cv, bandWidth, label, n: v.length };
+}
+
+function computeBand(dataPoints, days) {
+  let vals;
+  if (days === 'custom' && STATE.customBandFrom && STATE.customBandTo) {
+    vals = dataPoints
+      .filter(d => d.date >= STATE.customBandFrom && d.date <= STATE.customBandTo)
+      .map(d => d.value);
+  } else {
+    const cutoff = Date.now() - days * 86400 * 1000;
+    vals = dataPoints.filter(d => d.date.getTime() >= cutoff).map(d => d.value);
+  }
+  return computeBandFromVals(vals);
+}
+
+function badgeHtml(label) {
+  const cls = label.replace(' ', '-');
+  return `<span class="badge badge-${cls}">${label}</span>`;
+}
+
+function setStatus(msg, spinning = false) {
+  document.getElementById('status').innerHTML =
+    (spinning ? '<span class="spinner"></span>' : '') + msg;
+}
+
+// ── Treeherder fetching ──────────────────────────────────────────────────────
+
+async function fetchSignatures(platformKey) {
+  const cfg = PLATFORM_CONFIGS[platformKey];
+  const url = `https://treeherder.mozilla.org/api/project/${STATE.repo}/performance/signatures/?framework=${FRAMEWORK}&platform=${cfg.platform}`;
+  const resp = await fetch(url);
+  return resp.json();
+}
+
+function pickBestSig(sigs, testName, app) {
+  // Treeherder API returns test:'score' for overall score (not empty string like STMO)
+  const thTest = testName;
+  const candidates = Object.entries(sigs)
+    .filter(([, s]) => {
+      if (s.suite !== 'speedometer3') return false;
+      if (s.test !== thTest) return false;
+      if (s.application !== app) return false;
+      const opts = s.extra_options || '';
+      if (opts.includes('gecko-profile')) return false;
+      if (opts.includes('simpleperf')) return false;
+      if (opts.includes('nova')) return false;
+      return true;
+    })
+    .map(([id, s]) => ({ id, s }));
+
+  if (candidates.length === 0) return null;
+  // Prefer fission+webrender, not nightlyasrelease
+  const ranked = candidates.sort((a, b) => {
+    const score = c => {
+      const o = c.s.extra_options || '';
+      return (o.includes('fission') ? 2 : 0) +
+             (o.includes('webrender') ? 1 : 0) +
+             (o.includes('nightlyasrelease') ? -3 : 0);
+    };
+    return score(b) - score(a);
+  });
+  return ranked[0];
+}
+
+async function fetchSeriesData(sigId, days) {
+  const interval = days * 86400;
+  const url = `https://treeherder.mozilla.org/api/performance/summary/?repository=${STATE.repo}&signature=${sigId}&framework=${FRAMEWORK}&interval=${interval}&all_data=true`;
+  const resp = await fetch(url);
+  const data = await resp.json();
+  if (!Array.isArray(data) || !data[0]?.data) return [];
+  return data[0].data.map(pt => ({
+    date: new Date((typeof pt.push_timestamp === 'string'
+      ? new Date(pt.push_timestamp).getTime()
+      : pt.push_timestamp * 1000)),
+    value: pt.value,
+    revision: pt.revision,
+    sigId,
+  }));
+}
+
+function perfherderUrl(sigId) {
+  return `https://treeherder.mozilla.org/perfherder/graphs?highlightAlerts=1&highlightChangelogData=1&series=${STATE.repo},${sigId},1,${FRAMEWORK}`;
+}
+
+// ── Load all tests for current platform ─────────────────────────────────────
+
+async function loadPlatform() {
+  const platformKey = STATE.platform;
+  const cfg = PLATFORM_CONFIGS[platformKey];
+  const fetchDays = Math.max(STATE.bandDays, 90); // always fetch enough for band
+
+  setStatus(`Loading signatures for ${cfg.label}…`, true);
+
+  let allSigs;
+  try {
+    allSigs = await fetchSignatures(platformKey);
+  } catch (e) {
+    setStatus(`Error fetching signatures: ${e.message}`);
+    return;
+  }
+
+  // Determine test list
+  let testList = SUBTEST_TOTALS;
+  if (STATE.scope === 'all') {
+    // Pull all unique test names from the signatures
+    const seen = new Set();
+    for (const s of Object.values(allSigs)) {
+      if (s.suite !== 'speedometer3') continue;
+      if (s.application !== cfg.app) continue;
+      const opts = s.extra_options || '';
+      if (opts.includes('gecko-profile') || opts.includes('simpleperf')) continue;
+      const t = s.test === '' ? 'score' : s.test;
+      seen.add(t);
+    }
+    testList = [...seen].sort();
+  }
+
+  // Map test -> signature
+  STATE.sigByTest = {};
+  for (const test of testList) {
+    const match = pickBestSig(allSigs, test, cfg.app);
+    if (match) STATE.sigByTest[test] = match.id;
+  }
+
+  const tests = Object.keys(STATE.sigByTest);
+  setStatus(`Fetching data for ${tests.length} tests on ${cfg.label}…`, true);
+
+  // Fetch series data in parallel (batches to avoid hammering)
+  STATE.seriesData = {};
+  STATE.bands = {};
+
+  const BATCH = 10;
+  for (let i = 0; i < tests.length; i += BATCH) {
+    const batch = tests.slice(i, i + BATCH);
+    await Promise.all(batch.map(async test => {
+      try {
+        const pts = await fetchSeriesData(STATE.sigByTest[test], fetchDays);
+        STATE.seriesData[test] = pts;
+        STATE.bands[test] = computeBand(pts, STATE.bandDays);
+      } catch (e) {
+        console.warn(`Failed to fetch ${test}:`, e);
+      }
+    }));
+    setStatus(`Loading… ${Math.min(i + BATCH, tests.length)} / ${tests.length}`, true);
+  }
+
+  setStatus(`${cfg.label} — ${tests.length} tests loaded, band = last ${STATE.bandDays} days`);
+  renderTable();
+
+  // Re-render selected test chart if one was selected
+  if (STATE.selectedTest && STATE.seriesData[STATE.selectedTest]) {
+    renderChart(STATE.selectedTest);
+  }
+}
+
+// ── Table ────────────────────────────────────────────────────────────────────
+
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  const tests = Object.keys(STATE.bands).filter(t => STATE.bands[t]);
+
+  tests.sort((a, b) => {
+    const va = STATE.bands[a][STATE.sortCol] ?? (typeof STATE.bands[a][STATE.sortCol] === 'string' ? '' : 0);
+    const vb = STATE.bands[b][STATE.sortCol] ?? (typeof STATE.bands[b][STATE.sortCol] === 'string' ? '' : 0);
+    if (typeof va === 'string') return va.localeCompare(vb) * STATE.sortDir;
+    return (va - vb) * STATE.sortDir;
+  });
+
+  if (tests.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; color:#888; text-align:center;">No data — check browser console for errors</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = tests.map(test => {
+    const b = STATE.bands[test];
+    const sigId = STATE.sigByTest[test];
+    const displayName = test === 'score' ? 'Overall Score' : test.replace('/total', '');
+    const isSelected = STATE.selectedTest === test;
+    return `<tr data-test="${encodeURIComponent(test)}" class="${isSelected ? 'selected' : ''}">
+      <td class="name">${displayName}</td>
+      <td>${badgeHtml(b.label)}</td>
+      <td class="numeric">${round(b.bandWidth, 1)}%</td>
+      <td class="numeric">${round(b.cv, 1)}%</td>
+      <td class="numeric">${round(b.p05, 2)}</td>
+      <td class="numeric">${round(b.p50, 2)}</td>
+      <td class="numeric">${round(b.p95, 2)}</td>
+      <td class="numeric">${b.n}</td>
+      <td><a class="ph-link" href="${perfherderUrl(sigId)}" target="_blank" onclick="event.stopPropagation()">↗ PH</a></td>
+    </tr>`;
+  }).join('');
+
+  // Row click → chart
+  tbody.querySelectorAll('tr').forEach(row => {
+    row.addEventListener('click', () => {
+      const test = decodeURIComponent(row.dataset.test);
+      tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      STATE.selectedTest = test;
+      renderChart(test);
+    });
+  });
+}
+
+// ── Chart ────────────────────────────────────────────────────────────────────
+
+function renderChart(test) {
+  const section = document.getElementById('chart-section');
+  section.style.display = 'block';
+  section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const cfg = PLATFORM_CONFIGS[STATE.platform];
+  const displayName = test === 'score' ? 'Overall Score' : test.replace('/total', '');
+  document.getElementById('chart-title').textContent = `${displayName} — ${cfg.label}`;
+
+  const allPts = STATE.seriesData[test] || [];
+
+  // Filter to chart range (fixed window or custom date range)
+  let pts;
+  if (STATE.chartDays === 'custom' && STATE.customFrom && STATE.customTo) {
+    pts = allPts.filter(d => d.date >= STATE.customFrom && d.date <= STATE.customTo);
+  } else {
+    const cutoff = new Date(Date.now() - STATE.chartDays * 86400 * 1000);
+    pts = allPts.filter(d => d.date >= cutoff);
+  }
+  pts = pts.sort((a, b) => a.date - b.date);
+
+  // For score: higher is better; for timing subtests: lower is better
+  const lowerIsBetter = test !== 'score';
+
+  // Band computed from the visible points only
+  const band = computeBandFromVals(pts.map(d => d.value));
+  const rangeLabel = STATE.chartDays === 'custom' ? 'custom range' : `last ${STATE.chartDays} days`;
+
+  document.getElementById('chart-meta').textContent =
+    `${pts.length} points shown · band from ${rangeLabel} (${band ? band.n : 0} pts)`;
+
+  if (STATE.chart) { STATE.chart.destroy(); STATE.chart = null; }
+
+  const ctx = document.getElementById('chart');
+  const annotations = {};
+
+  if (band) {
+    annotations.band = {
+      type: 'box',
+      yMin: band.p05,
+      yMax: band.p95,
+      backgroundColor: 'rgba(51, 102, 255, 0.07)',
+      borderColor: 'rgba(51, 102, 255, 0.25)',
+      borderWidth: 1,
+    };
+    annotations.lineP05 = {
+      type: 'line', yMin: band.p05, yMax: band.p05,
+      borderColor: 'rgba(51, 102, 255, 0.5)', borderWidth: 1, borderDash: [4, 3],
+      label: { display: true, content: `P05: ${round(band.p05, 2)}`, position: 'start',
+               backgroundColor: 'rgba(51,102,255,0.12)', color: '#3366ff', font: { size: 10 } }
+    };
+    annotations.lineP95 = {
+      type: 'line', yMin: band.p95, yMax: band.p95,
+      borderColor: 'rgba(51, 102, 255, 0.5)', borderWidth: 1, borderDash: [4, 3],
+      label: { display: true, content: `P95: ${round(band.p95, 2)}`, position: 'start',
+               backgroundColor: 'rgba(51,102,255,0.12)', color: '#3366ff', font: { size: 10 } }
+    };
+    annotations.lineMedian = {
+      type: 'line', yMin: band.p50, yMax: band.p50,
+      borderColor: 'rgba(51, 102, 255, 0.3)', borderWidth: 1, borderDash: [2, 4],
+      label: { display: true, content: `Median: ${round(band.p50, 2)}`, position: 'end',
+               backgroundColor: 'rgba(51,102,255,0.08)', color: '#888', font: { size: 10 } }
+    };
+  }
+
+  STATE.chart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: cfg.app === 'fenix' ? 'Fenix' : 'Firefox',
+        data: pts.map(d => ({ x: d.date, y: d.value, revision: d.revision })),
+        pointRadius: 3,
+        pointBackgroundColor: '#FF9500cc',
+        pointBorderColor: '#0004',
+        pointBorderWidth: 0.5,
+        pointHoverRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => new Date(ctx[0].parsed.x).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            label: ctx => {
+              const d = ctx.dataset.data[ctx.dataIndex];
+              const rev = d.revision ? ` (${d.revision.slice(0, 7)})` : '';
+              let s = `${round(ctx.parsed.y, 3)}${rev}`;
+              if (band) {
+                const deltaPct = (ctx.parsed.y / band.p50 - 1) * 100;
+                s += `  ${deltaPct > 0 ? '+' : ''}${round(deltaPct, 1)}% vs median`;
+                if (ctx.parsed.y < band.p05 || ctx.parsed.y > band.p95) {
+                  s += '  ⚠ outside band';
+                }
+              }
+              return s;
+            }
+          }
+        },
+        annotation: { annotations }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'day', tooltipFormat: 'MMM dd yyyy' },
+          title: { display: false }
+        },
+        y: {
+          beginAtZero: false,
+          title: { display: true, text: lowerIsBetter ? 'Time (ms, lower = better)' : 'Score (higher = better)', font: { size: 11 } }
+        }
+      },
+      onClick: (evt, elems) => {
+        if (!elems.length) return;
+        const d = STATE.chart.data.datasets[0].data[elems[0].index];
+        if (d.revision) {
+          window.open(`https://hg-edge.mozilla.org/integration/autoland/rev/${d.revision}`, '_blank');
+        }
+      }
+    }
+  });
+
+  ctx.parentElement.style.height = '340px';
+
+  // Band summary below chart
+  if (band) {
+    const labelColor = { quiet: '#1a7a45', moderate: '#2255cc', noisy: '#b36000', 'very noisy': '#c00' };
+    document.getElementById('band-info').innerHTML = `
+      <div class="band-info-row">
+        <div class="band-info-item">
+          <span class="label">Noisiness</span>
+          <span class="value" style="color:${labelColor[band.label]}">${band.label}</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">Band width (P95−P05)/median</span>
+          <span class="value">${round(band.bandWidth, 1)}%</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">CV (stddev/mean)</span>
+          <span class="value">${round(band.cv, 1)}%</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">P05</span>
+          <span class="value">${round(band.p05, 2)}</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">Median</span>
+          <span class="value">${round(band.p50, 2)}</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">P95</span>
+          <span class="value">${round(band.p95, 2)}</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">Points in window</span>
+          <span class="value">${band.n}</span>
+        </div>
+        <div class="band-info-item">
+          <span class="label">Window</span>
+          <span class="value">${rangeLabel}</span>
+        </div>
+        <div class="band-info-item" style="margin-left:auto">
+          <span class="label">Perfherder</span>
+          <span class="value"><a class="ph-link" style="font-size:14px"
+            href="${perfherderUrl(STATE.sigByTest[test])}" target="_blank">Open ↗</a></span>
+        </div>
+      </div>`;
+  }
+}
+
+// ── Table sorting ────────────────────────────────────────────────────────────
+
+document.querySelectorAll('#noise-table thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (STATE.sortCol === col) {
+      STATE.sortDir *= -1;
+    } else {
+      STATE.sortCol = col;
+      STATE.sortDir = col === 'name' || col === 'label' ? 1 : -1;
+    }
+    document.querySelectorAll('#noise-table thead th').forEach(h => {
+      h.classList.remove('sort-asc', 'sort-desc');
+    });
+    th.classList.add(STATE.sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    renderTable();
+  });
+});
+
+// ── Control wiring ───────────────────────────────────────────────────────────
+
+document.querySelectorAll('#repo-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#repo-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.repo = btn.dataset.repo;
+    STATE.selectedTest = null;
+    document.getElementById('chart-section').style.display = 'none';
+    loadPlatform();
+  });
+});
+
+document.querySelectorAll('#platform-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#platform-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.platform = btn.dataset.platform;
+    STATE.selectedTest = null;
+    document.getElementById('chart-section').style.display = 'none';
+    loadPlatform();
+  });
+});
+
+document.querySelectorAll('#band-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#band-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const customEl = document.getElementById('custom-band-range');
+    if (btn.dataset.days === 'custom') {
+      customEl.style.display = 'flex';
+      const to = new Date();
+      const from = new Date(Date.now() - 30 * 86400 * 1000);
+      document.getElementById('band-date-to').value = to.toISOString().slice(0, 10);
+      document.getElementById('band-date-from').value = from.toISOString().slice(0, 10);
+      STATE.bandDays = 'custom';
+    } else {
+      customEl.style.display = 'none';
+      STATE.bandDays = +btn.dataset.days;
+      STATE.customBandFrom = null;
+      STATE.customBandTo = null;
+      recomputeTableBands();
+    }
+  });
+});
+
+function applyCustomBandRange() {
+  const from = document.getElementById('band-date-from').value;
+  const to = document.getElementById('band-date-to').value;
+  if (!from || !to) return;
+  STATE.customBandFrom = new Date(from);
+  STATE.customBandTo = new Date(to + 'T23:59:59');
+  recomputeTableBands();
+}
+
+function recomputeTableBands() {
+  for (const [test, pts] of Object.entries(STATE.seriesData)) {
+    STATE.bands[test] = computeBand(pts, STATE.bandDays);
+  }
+  const label = STATE.bandDays === 'custom'
+    ? `${document.getElementById('band-date-from').value} → ${document.getElementById('band-date-to').value}`
+    : `last ${STATE.bandDays} days`;
+  setStatus(`Table band recomputed from ${label}`);
+  renderTable();
+  if (STATE.selectedTest) renderChart(STATE.selectedTest);
+}
+
+document.querySelectorAll('#test-scope-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#test-scope-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    STATE.scope = btn.dataset.scope;
+    STATE.selectedTest = null;
+    document.getElementById('chart-section').style.display = 'none';
+    loadPlatform();
+  });
+});
+
+document.querySelectorAll('#range-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#range-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const customEl = document.getElementById('custom-range');
+    if (btn.dataset.days === 'custom') {
+      customEl.style.display = 'flex';
+      // Pre-fill dates sensibly
+      const to = new Date();
+      const from = new Date(Date.now() - 30 * 86400 * 1000);
+      document.getElementById('date-to').value = to.toISOString().slice(0, 10);
+      document.getElementById('date-from').value = from.toISOString().slice(0, 10);
+      STATE.chartDays = 'custom';
+    } else {
+      customEl.style.display = 'none';
+      STATE.chartDays = +btn.dataset.days;
+      STATE.customFrom = null;
+      STATE.customTo = null;
+      if (STATE.selectedTest) renderChart(STATE.selectedTest);
+    }
+  });
+});
+
+function applyCustomRange() {
+  const from = document.getElementById('date-from').value;
+  const to = document.getElementById('date-to').value;
+  if (!from || !to) return;
+  STATE.customFrom = new Date(from);
+  STATE.customTo = new Date(to + 'T23:59:59');
+  if (STATE.selectedTest) renderChart(STATE.selectedTest);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+loadPlatform();
+</script>
+</body>
+</html>
