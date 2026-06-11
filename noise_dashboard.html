@@ -511,7 +511,7 @@ function perfherderUrl(sigId) {
 async function loadPlatform() {
   const platformKey = STATE.platform;
   const cfg = PLATFORM_CONFIGS[platformKey];
-  const fetchDays = Math.max(STATE.bandDays, 90); // always fetch enough for band
+  const fetchDays = 365; // always fetch a full year so all chart ranges work
 
   setStatus(`Loading signatures for ${cfg.label}…`, true);
 
@@ -661,8 +661,11 @@ function renderChart(test) {
   const band = computeBandFromVals(pts.map(d => d.value));
   const rangeLabel = STATE.chartDays === 'custom' ? 'custom range' : `last ${STATE.chartDays} days`;
 
+  const bandSummary = band
+    ? `band ${round(band.bandWidth, 1)}% (P05=${round(band.p05, 1)}  P95=${round(band.p95, 1)}) · ${band.label}`
+    : 'not enough data for band';
   document.getElementById('chart-meta').textContent =
-    `${pts.length} points shown · band from ${rangeLabel} (${band ? band.n : 0} pts)`;
+    `${pts.length} pts · ${rangeLabel} · ${bandSummary}`;
 
   if (STATE.chart) { STATE.chart.destroy(); STATE.chart = null; }
 
