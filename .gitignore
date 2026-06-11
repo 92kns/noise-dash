@@ -1,0 +1,4 @@
+analysis/timeseries_cache.json
+analysis/__pycache__/
+*.pyc
+.DS_Store
