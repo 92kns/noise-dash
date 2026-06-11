@@ -214,7 +214,7 @@
     </div>
   </div>
   <div class="control-group">
-    <label title="Controls the date window used to compute P5/P95 in the summary table. Shorter windows show recent noise; longer windows give a more stable baseline. Independent from the chart range.">Table band window <span style="color:#aaa;font-size:11px;cursor:default">(?)</span></label>
+    <label title="The date window used to compute P5/P95 noise band — applies to both the chart band and the summary table. Shorter windows show recent noise; longer windows give a more stable baseline. Independent from the chart range (which only controls what dots are shown).">Band window <span style="color:#aaa;font-size:11px;cursor:default">(?)</span></label>
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
       <div class="btn-group" id="band-btns">
         <button data-days="7">7d</button>
@@ -657,15 +657,18 @@ function renderChart(test) {
   // For score: higher is better; for timing subtests: lower is better
   const lowerIsBetter = test !== 'score';
 
-  // Band computed from the visible points only
-  const band = computeBandFromVals(pts.map(d => d.value));
-  const rangeLabel = STATE.chartDays === 'custom' ? 'custom range' : `last ${STATE.chartDays} days`;
+  // Band window and chart range are independent:
+  //   pts       = what scatter dots to show (driven by chart range buttons)
+  //   band      = P5/P95 computed from STATE.bandDays (driven by top band window control)
+  const band = computeBand(allPts, STATE.bandDays);
 
+  const chartRangeLabel = STATE.chartDays === 'custom' ? 'custom' : `last ${STATE.chartDays}d`;
+  const bandWindowLabel = STATE.bandDays === 'custom' ? 'custom' : `${STATE.bandDays}d`;
   const bandSummary = band
     ? `band ${round(band.bandWidth, 1)}% (P05=${round(band.p05, 1)}  P95=${round(band.p95, 1)}) · ${band.label}`
     : 'not enough data for band';
   document.getElementById('chart-meta').textContent =
-    `${pts.length} pts · ${rangeLabel} · ${bandSummary}`;
+    `showing ${chartRangeLabel} · band window ${bandWindowLabel} · ${bandSummary}`;
 
   if (STATE.chart) { STATE.chart.destroy(); STATE.chart = null; }
 
@@ -796,8 +799,8 @@ function renderChart(test) {
           <span class="value">${band.n}</span>
         </div>
         <div class="band-info-item">
-          <span class="label">Window</span>
-          <span class="value">${rangeLabel}</span>
+          <span class="label">Band window</span>
+          <span class="value">${bandWindowLabel}</span>
         </div>
         <div class="band-info-item" style="margin-left:auto">
           <span class="label">Perfherder</span>
